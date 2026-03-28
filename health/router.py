@@ -1,7 +1,6 @@
 from fastapi import APIRouter
-from models.schemas import HealthResponse
-from services.ollama_client import ollama_client
-from services.rag_service import rag_service
+from health.schemas import HealthResponse
+from core import ollama_client, rag_service
 from database import check_db_connection
 from config import settings
 

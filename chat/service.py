@@ -1,10 +1,9 @@
 import logging
-from services.ollama_client import ollama_client
-from services.context_service import context_service
-from services.rag_service import rag_service
-from services.chat_history import chat_history
-from services.action_service import action_service
-from prompts.system_prompts import CHAT_SYSTEM_PROMPT, TITLE_GENERATION_PROMPT
+from core import ollama_client, rag_service
+from chat.context import chat_context_service
+from chat.history import chat_history
+from chat.actions import action_service
+from chat.prompts import CHAT_SYSTEM_PROMPT, TITLE_GENERATION_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,7 @@ class LLMService:
         chat_history.add_message(conversation_id, "user", message)
 
         # Build context
-        business_context = context_service.get_context_for_type(context_type)
+        business_context = chat_context_service.get_context_for_type(context_type)
 
         # Search RAG for relevant documents
         rag_context = ""

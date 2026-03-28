@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from dependencies import verify_api_key
-from models.schemas import DocumentProcessRequest, DocumentProcessResponse
-from services.document_processor import document_processor
+from documents.schemas import DocumentProcessRequest, DocumentProcessResponse
+from documents.service import document_processor
 
 router = APIRouter(prefix="/documents", tags=["Documents"], dependencies=[Depends(verify_api_key)])
 

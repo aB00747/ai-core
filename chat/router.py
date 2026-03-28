@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from dependencies import verify_api_key
-from models.schemas import (
+from chat.schemas import (
     ChatRequest,
     ChatResponse,
     ConversationListResponse,
     ConversationMessagesResponse,
 )
-from services.llm_service import llm_service
-from services.chat_history import chat_history
+from chat.service import llm_service
+from chat.history import chat_history
 
 router = APIRouter(prefix="/chat", tags=["Chat"], dependencies=[Depends(verify_api_key)])
 
