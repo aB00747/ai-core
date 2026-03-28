@@ -1,9 +1,9 @@
 import json
 import logging
 from datetime import datetime, timezone
-from services.ollama_client import ollama_client
-from services.context_service import context_service
-from prompts.system_prompts import (
+from core import ollama_client
+from insights.context import insight_context_service
+from insights.prompts import (
     INSIGHT_SALES_PROMPT,
     INSIGHT_INVENTORY_PROMPT,
     INSIGHT_CUSTOMER_PROMPT,
@@ -37,7 +37,7 @@ class InsightsService:
     async def generate_insight(self, insight_type: str, period_days: int = 30) -> dict:
         """Generate a specific type of insight."""
         # Get data from ERP
-        data = context_service.get_data_for_insight(insight_type, period_days)
+        data = insight_context_service.get_data_for_insight(insight_type, period_days)
 
         # Get the appropriate prompt
         prompt_template = INSIGHT_PROMPTS.get(insight_type)
@@ -68,7 +68,7 @@ class InsightsService:
 
     async def quick_insights(self) -> dict:
         """Generate quick dashboard insights."""
-        data = context_service.get_quick_insights_data()
+        data = insight_context_service.get_quick_insights_data()
         prompt = QUICK_INSIGHTS_PROMPT.format(data=data)
 
         try:

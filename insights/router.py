@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from dependencies import verify_api_key
-from models.schemas import InsightRequest, InsightResponse, QuickInsightsResponse
-from services.insights_service import insights_service
+from insights.schemas import InsightRequest, InsightResponse, QuickInsightsResponse
+from insights.service import insights_service
 
 router = APIRouter(prefix="/insights", tags=["Insights"], dependencies=[Depends(verify_api_key)])
 

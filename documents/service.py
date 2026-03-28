@@ -1,9 +1,8 @@
 import logging
 import uuid
 from pathlib import Path
-from services.ollama_client import ollama_client
-from services.rag_service import rag_service
-from prompts.system_prompts import DOCUMENT_SUMMARY_PROMPT
+from core import ollama_client, rag_service
+from documents.prompts import DOCUMENT_SUMMARY_PROMPT
 
 logger = logging.getLogger(__name__)
 

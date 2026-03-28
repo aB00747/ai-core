@@ -3,8 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
-from services.rag_service import rag_service
-from services.chat_history import chat_history
+from core import rag_service
+from chat.history import chat_history
 
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
@@ -51,10 +51,10 @@ app.add_middleware(
 )
 
 # Register routers
-from routers.health import router as health_router
-from routers.chat import router as chat_router
-from routers.insights import router as insights_router
-from routers.documents import router as documents_router
+from health import router as health_router
+from chat import router as chat_router
+from insights import router as insights_router
+from documents import router as documents_router
 
 app.include_router(health_router)
 app.include_router(chat_router)
