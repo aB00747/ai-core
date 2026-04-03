@@ -23,12 +23,31 @@ class ActionData(BaseModel):
     errors: list[str] = []
 
 
+class ActionStep(BaseModel):
+    step_id: str
+    type: str
+    params: dict = {}
+    display: dict = {}
+    depends_on: list[str] = []
+    auto_execute: bool = False
+    risk_level: str = "low"  # "low" or "high"
+    errors: list[str] = []
+    resolved: bool = True
+
+
+class ActionPlan(BaseModel):
+    steps: list[ActionStep] = []
+    summary: str = ""
+    has_high_risk: bool = False
+
+
 class ChatResponse(BaseModel):
     response: str
     conversation_id: str
     title: str | None = None
     sources: list[str] = []
     action: ActionData | None = None
+    action_plan: ActionPlan | None = None
 
 
 class ConversationSummary(BaseModel):

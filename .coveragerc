@@ -1,0 +1,16 @@
+[run]
+source = chat,core,documents,health,insights
+omit =
+    venv/*
+    tests/*
+    debug_view/*
+    data/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__
+    pass
+
+[xml]
+output = coverage.xml

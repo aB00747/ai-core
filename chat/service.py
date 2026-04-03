@@ -30,6 +30,9 @@ class LLMService:
         # Build context
         business_context = chat_context_service.get_context_for_type(context_type)
 
+        # Get market pricing context
+        market_pricing_context = await chat_context_service.get_market_pricing_context(message)
+
         # Search RAG for relevant documents
         rag_context = ""
         try:
@@ -49,6 +52,7 @@ class LLMService:
         system_prompt = CHAT_SYSTEM_PROMPT.format(
             business_context=business_context,
             rag_context=rag_context,
+            market_pricing_context=market_pricing_context,
         )
 
         # Get chat history for context
@@ -64,20 +68,36 @@ class LLMService:
             response = await ollama_client.chat(messages)
         except Exception as e:
             logger.error(f"Ollama error: {e}")
-            response = "I'm sorry, I'm having trouble connecting to the AI model right now. Please try again in a moment."
+            response = (
+                "I'm sorry, I'm having trouble connecting to the AI model right now. "
+                "Please try again in a moment."
+            )
 
-        # Parse action from response (if any)
-        clean_response, action_data = action_service.parse_action_from_response(response)
+        # Parse action or action plan from response
+        clean_response, action_data, plan_data = action_service.parse_action_from_response(response)
 
-        # Resolve action (look up IDs for customer/chemical names)
-        resolved_action = None
-        if action_data:
+        # Resolve action plan (multi-step)
+        resolved_plan = None
+        if plan_data:
             try:
-                resolved_action = action_service.resolve_action(action_data)
-                if resolved_action.get("errors"):
-                    # Add error info to the response text
-                    error_text = "\n\nNote: " + " ".join(resolved_action["errors"])
-                    clean_response += error_text
+                resolved_plan = action_service.resolve_action_plan(plan_data)
+            except Exception as e:
+                logger.error(f"Action plan resolution failed: {e}")
+
+        # Resolve single action (may upgrade to plan if dependencies missing)
+        resolved_action = None
+        if action_data and not plan_data:
+            try:
+                resolved = action_service.resolve_action(action_data)
+
+                # Check if the resolver upgraded this to a plan
+                if resolved.get("_is_plan"):
+                    resolved_plan = resolved["plan"]
+                else:
+                    resolved_action = resolved
+                    if resolved_action.get("errors"):
+                        error_text = "\n\nNote: " + " ".join(resolved_action["errors"])
+                        clean_response += error_text
             except Exception as e:
                 logger.error(f"Action resolution failed: {e}")
 
@@ -100,6 +120,8 @@ class LLMService:
             sources.append("Indexed documents")
         if business_context and "unavailable" not in business_context.lower():
             sources.append("ERP database")
+        if market_pricing_context and "No market pricing" not in market_pricing_context:
+            sources.append("Market pricing data")
 
         result = {
             "response": clean_response,
@@ -107,6 +129,7 @@ class LLMService:
             "title": title,
             "sources": sources,
             "action": resolved_action,
+            "action_plan": resolved_plan,
         }
 
         return result
@@ -116,7 +139,6 @@ class LLMService:
         prompt = TITLE_GENERATION_PROMPT.format(message=message[:200])
         try:
             title = await ollama_client.generate(prompt, temperature=0.3)
-            # Clean up - take first line, strip quotes
             title = title.strip().split("\n")[0].strip('"\'')
             if len(title) > 50:
                 title = title[:47] + "..."
