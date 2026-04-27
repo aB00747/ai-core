@@ -2,94 +2,77 @@ import json
 import ollama
 
 
-PARSE_PROMPT = """You are an invoice parser. Given a list of text blocks extracted from an invoice image (each with text content and position on page), identify what each block represents and return structured JSON.
+PARSE_PROMPT = """Extract invoice fields from these text lines. Return ONLY a JSON object, no explanation, no code.
 
-Text blocks (each has: text, x, y, width, height as fractions of page 0.0-1.0):
-{blocks}
+Text lines:
+{lines}
 
-Return ONLY valid JSON in this exact format:
+Return this exact JSON structure:
 {{
   "fields": {{
-    "company_name": "...",
-    "company_gstin": "...",
-    "invoice_number": "...",
-    "invoice_date": "...",
-    "buyer_name": "...",
-    "buyer_gstin": "...",
-    "buyer_address": "...",
-    "grand_total": "..."
-  }},
-  "elements": [
-    {{
-      "type": "text|field",
-      "x_frac": 0.0,
-      "y_frac": 0.0,
-      "w_frac": 0.2,
-      "h_frac": 0.03,
-      "props": {{
-        "content": "...",
-        "field": "invoice_number|buyer_name|invoice_date|buyer_gstin|grand_total|company_name|null",
-        "fontSize": 10,
-        "fontWeight": "normal|bold",
-        "textAlign": "left|center|right",
-        "color": "#141413",
-        "backgroundColor": "transparent"
-      }}
-    }}
-  ]
+    "company_name": "",
+    "company_gstin": "",
+    "invoice_number": "",
+    "invoice_date": "",
+    "buyer_name": "",
+    "buyer_gstin": "",
+    "buyer_address": "",
+    "grand_total": ""
+  }}
 }}
 
-Rules:
-- Use type "field" when the block is dynamic invoice data (invoice number, date, buyer info, totals)
-- Use type "text" for static labels and headings
-- x_frac/y_frac/w_frac/h_frac are fractions of page dimensions (0.0 to 1.0)
-- Set field to null for static text elements
-- Detect heading rows (bold, centred) and set fontWeight "bold"
-"""
+Fill in values found in the text. Leave empty string if not found."""
 
 
 def parse_invoice_blocks(text_blocks: list, page_width: int, page_height: int) -> dict:
-    """Send Tesseract blocks to Ollama for field mapping."""
-    # Normalise positions to fractions
-    normalised = []
+    """Send OCR text blocks to Ollama for field extraction."""
+    # Group words into lines by y-coordinate (bucket to nearest 20px)
+    line_bucket = {}
     for b in text_blocks:
-        normalised.append({
-            'text': b['text'],
-            'x_frac': round(b['x'] / page_width, 3),
-            'y_frac': round(b['y'] / page_height, 3),
-            'w_frac': round(b['width'] / page_width, 3),
-            'h_frac': round(b['height'] / page_height, 3),
-            'confidence': b.get('confidence', 0),
-        })
+        y_key = round(b['y'] / 20) * 20
+        if y_key not in line_bucket:
+            line_bucket[y_key] = []
+        line_bucket[y_key].append(b['text'])
 
-    # Filter low-confidence blocks
-    normalised = [b for b in normalised if b['confidence'] > 40]
+    # Build compact line list sorted by y position
+    lines = []
+    for y_key in sorted(line_bucket.keys()):
+        line_text = ' '.join(line_bucket[y_key]).strip()
+        if line_text:
+            lines.append(line_text)
 
-    prompt = PARSE_PROMPT.format(blocks=json.dumps(normalised, indent=2))
+    # Keep at most 60 lines to stay well under token limit
+    lines = lines[:60]
+    lines_text = '\n'.join(lines)
+
+    prompt = PARSE_PROMPT.format(lines=lines_text)
 
     response = ollama.chat(
         model='llama3.1:8b',
         messages=[{'role': 'user', 'content': prompt}],
-        options={'temperature': 0.1},
+        options={'temperature': 0.0, 'num_ctx': 2048},
     )
 
     raw = response['message']['content'].strip()
-    # Extract JSON from response (LLM may wrap in markdown)
+
+    # Extract JSON from markdown code fences if present
     if '```' in raw:
-        raw = raw.split('```')[1]
+        parts = raw.split('```')
+        raw = parts[1]
         if raw.startswith('json'):
             raw = raw[4:]
+    raw = raw.strip()
 
-    parsed = json.loads(raw)
+    # Find the JSON object in the response
+    start = raw.find('{')
+    end = raw.rfind('}')
+    if start != -1 and end != -1:
+        raw = raw[start:end + 1]
 
-    # Convert fractional positions to px (A4 at 96dpi = 794×1123)
-    A4_W, A4_H = 794, 1123
-    for elem in parsed.get('elements', []):
-        elem['x'] = round(elem.pop('x_frac') * A4_W)
-        elem['y'] = round(elem.pop('y_frac') * A4_H)
-        elem['width'] = max(40, round(elem.pop('w_frac') * A4_W))
-        elem['height'] = max(14, round(elem.pop('h_frac') * A4_H))
-        elem['id'] = f"ocr-{elem['x']}-{elem['y']}"
-        elem['zIndex'] = 1
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise ValueError(f'Ollama returned invalid JSON: {e}\nRaw (first 300): {raw[:300]}')
 
-    return parsed
+    # Return fields only (no element layout — OCR populates the invoice form, not the canvas)
+    return {'fields': parsed.get('fields', {})}
