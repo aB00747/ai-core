@@ -41,10 +41,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS - allow Django backend
+# CORS - allow Django backend and frontend dev server
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],
+    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000",
+                   "http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,11 +56,13 @@ from health import router as health_router
 from chat import router as chat_router
 from insights import router as insights_router
 from documents import router as documents_router
+from ocr.router import router as ocr_router
 
 app.include_router(health_router)
 app.include_router(chat_router)
 app.include_router(insights_router)
 app.include_router(documents_router)
+app.include_router(ocr_router)
 
 
 @app.get("/")

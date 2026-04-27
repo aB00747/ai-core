@@ -1,0 +1,17 @@
+__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+.env
+.env.*
+.venv
+venv
+data/
+tests/
+debug_view/
+*.md
+.github
+.vscode
+.claude
+*.log
